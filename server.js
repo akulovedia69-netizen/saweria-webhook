@@ -56,8 +56,4 @@ app.get("/", (req, res) => {
     });
 });
 
-<<<<<<< HEAD
 app.listen(3000, () => console.log("🚀 Server ready - HTTP Polling Mode"));
-=======
-app.listen(3000, () => console.log("🚀 Server ready - HTTP Polling Mode"));
->>>>>>> 53f44bdfdedc37904a16dc1bb6fadaeea2277693
