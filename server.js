@@ -3,65 +3,55 @@ const { v4: uuidv4 } = require("uuid");
 const app = express();
 app.use(express.json());
 
-// -----------------------------
-// Data
-// -----------------------------
-// untuk leaderboard total (per player)
-let totalDonations = {}; // { "Andika": 5000, "Ujang": 3000 }
+// Leaderboard total per player
+let totalDonations = {}; 
 
-// untuk transaksi baru (antrian)
-let pendingTransactions = []; // transaksi per donasi (untuk notif 1:1)
+// Transaksi baru (untuk notif)
+let pendingTransactions = []; 
 
 
-// -----------------------------
-// GET untuk Roblox — kirim transaksi baru (notif saja)
-// -----------------------------
+// Roblox mengambil transaksi baru
 app.get("/api/donations", (req, res) => {
-    console.log("📦 Mengirim transaksi baru:", pendingTransactions.length);
+    console.log("📦 Transaksi baru dikirim:", pendingTransactions.length);
 
     const toSend = [...pendingTransactions];
-    pendingTransactions = []; // kosongkan agar tidak dikirim ulang
+    pendingTransactions = [];
 
     res.json(toSend);
 });
 
 
-// -----------------------------
-// POST dari Saweria — simpan transaksi & update total
-// -----------------------------
+// Webhook Saweria
 app.post("/DonationWebhook", (req, res) => {
-    const body = req.body;
+    const donation = req.body;
 
-    const amountRaw = body.amount_raw ?? body.etc?.amount_to_display ?? 0;
+    const amountRaw = donation.amount_raw ?? donation.etc?.amount_to_display ?? 0;
     const amount = parseInt(amountRaw) || 0;
+    const player = (donation.donator_name || "Unknown").trim();
+    const message = (donation.message || "").trim();
 
-    const player = (body.donator_name || "Unknown").trim();
-    const message = (body.message || "").trim();
-
-    // 🔥 1. Tambahkan ke total
+    // Update TOTAL donation untuk leaderboard
     totalDonations[player] = (totalDonations[player] || 0) + amount;
 
-    // 🔥 2. Buat transaksi baru untuk notif
+    // Buat transaksi baru untuk notif
     const entry = {
         id: uuidv4(),
         playerName: player,
-        amount: amount, // per transaksi
+        amount: amount, // PER transaksi
         message: message,
         timestamp: Date.now()
     };
 
     pendingTransactions.push(entry);
 
-    console.log("💰 Transaksi baru masuk:", entry);
-    console.log("📊 TOTAL Donasi", player, "=", totalDonations[player]);
+    console.log("💰 Transaksi baru:", entry);
+    console.log("📊 TOTAL", player, "=", totalDonations[player]);
 
     res.json({ success: true });
 });
 
 
-// -----------------------------
-// Root
-// -----------------------------
+// Root endpoint
 app.get("/", (req, res) => {
     res.json({
         status: "Saweria Webhook Active",
@@ -71,5 +61,4 @@ app.get("/", (req, res) => {
 });
 
 
-// -----------------------------
-app.listen(3000, () => console.log("🚀 Server siap (Leaderboard Total + Notif Transaksi)"));
+app.listen(3000, () => console.log("🚀 Server ready - Leaderboard TOTAL + Notif per transaksi"));
