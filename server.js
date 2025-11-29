@@ -26,29 +26,48 @@ app.get('/api/donations', (req, res) => {
   res.json(formatted);
 });
 
-// Webhook from Saweria
+// Webhook from Saweria - IMPROVED ERROR HANDLING
 app.post('/api/webhook', (req, res) => {
-  console.log('POST /api/webhook');
+  console.log('🔄 WEBHOOK RECEIVED - Body:', JSON.stringify(req.body));
   
-  const data = req.body;
-  const amount = data.amount || 0;
-  const donorName = data.donator_name || 'Anonymous';
-  
-  if (amount === 0) {
-    return res.status(400).json({ error: 'Invalid amount' });
-  }
+  try {
+    const data = req.body;
+    
+    if (!data) {
+      console.log('❌ ERROR: No data received');
+      return res.status(400).json({ error: 'No data received' });
+    }
 
-  // Accumulate donations
-  donorTotals[donorName] = (donorTotals[donorName] || 0) + amount;
-  
-  console.log('DONATION ADDED:', donorName, '+Rp' + amount, 'Total: Rp' + donorTotals[donorName]);
-  
-  res.json({ 
-    success: true, 
-    donor: donorName,
-    newDonation: amount,
-    totalNow: donorTotals[donorName]
-  });
+    // Debug: Log semua field yang diterima
+    console.log('📦 Raw data fields:', Object.keys(data));
+    
+    const amount = data.amount || data.amount_raw || 0;
+    const donorName = data.donator_name || data.donatorName || 'Anonymous';
+    
+    console.log('🔍 Parsed - Amount:', amount, 'Donor:', donorName);
+
+    if (!amount || amount === 0) {
+      console.log('❌ ERROR: Invalid amount:', amount);
+      return res.status(400).json({ error: 'Invalid amount: ' + amount });
+    }
+
+    // Accumulate donations
+    const previousTotal = donorTotals[donorName] || 0;
+    donorTotals[donorName] = previousTotal + amount;
+    
+    console.log('💰 DONATION ADDED:', donorName, '+Rp' + amount, 'Total: Rp' + donorTotals[donorName]);
+    
+    res.json({ 
+      success: true, 
+      donor: donorName,
+      newDonation: amount,
+      totalNow: donorTotals[donorName]
+    });
+    
+  } catch (error) {
+    console.log('❌ SERVER ERROR:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
 });
 
 // Health check
@@ -63,13 +82,13 @@ app.get('/api/health', (req, res) => {
 // Root
 app.get('/', (req, res) => {
   res.json({ 
-    message: 'Saweria Webhook Server',
+    message: 'Saweria Webhook Server - DEBUG MODE',
     totalDonors: Object.keys(donorTotals).length
   });
 });
 
 app.listen(PORT, () => {
-  console.log('Server running on port', PORT);
+  console.log('🚀 Server running on port', PORT, '- DEBUG MODE');
 });
 
 export default app;
