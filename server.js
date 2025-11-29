@@ -1,74 +1,117 @@
-const express = require("express");
-const app = express();
+import express from 'express';
+import cors from 'cors';
 
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
 app.use(express.json());
 
-// Simpan donasi sementara
+// Simpan data donasi di memory (untuk production, gunakan database)
 let donations = [];
+let processedIds = new Set();
 
-// ==============================
-//  ROBLOX FETCH ENDPOINT
-// ==============================
-app.get("/api/donations", (req, res) => {
-    console.log("📦 Roblox mengambil donasi:", donations.length);
-
-    // Kirim semua data
+// ✅ Endpoint untuk Roblox fetch data
+app.get('/api/donations', (req, res) => {
+  try {
+    console.log('📊 Fetching donations data for Roblox');
     res.json(donations);
-
-    // Hapus setelah dikirim (ANTI-LAG)
-    donations = [];
+  } catch (error) {
+    console.error('Error fetching donations:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-// ==============================
-//  SAWERIA WEBHOOK
-// ==============================
-app.post("/DonationWebhook", (req, res) => {
-    const donation = req.body;
+// ✅ Endpoint untuk webhook Saweria
+app.post('/api/webhook', (req, res) => {
+  try {
+    const saweriaData = req.body;
+    console.log('🔄 Received webhook from Saweria:', saweriaData);
 
-    const data = {
-        playerName: donation.donator_name?.trim() || "Unknown",
-        amount: parseInt(donation.amount_raw || donation?.etc?.amount_to_display || 0),
-        message: donation.message?.trim() || ""
+    // Validasi data dasar
+    if (!saweriaData || !saweriaData.amount) {
+      return res.status(400).json({ error: 'Invalid donation data' });
+    }
+
+    // Generate unique ID jika tidak ada
+    const donationId = saweriaData.id || `saweria_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Cek duplikasi
+    if (processedIds.has(donationId)) {
+      console.log('⏭️ Duplicate donation, skipping:', donationId);
+      return res.json({ success: true, message: 'Duplicate donation ignored' });
+    }
+
+    // Format data untuk kompatibilitas Roblox
+    const donationData = {
+      id: donationId,
+      amount: saweriaData.amount,
+      donor_name: saweriaData.donator_name || 'Anonymous',
+      playerName: saweriaData.donator_name || 'Anonymous', // Untuk Roblox
+      message: saweriaData.message || '',
+      timestamp: new Date().toISOString(),
+      rawData: saweriaData // Simpan data asli untuk debugging
     };
 
-    console.log("💰 Donasi diterima:", data);
+    // Simpan donation
+    donations.push(donationData);
+    processedIds.add(donationId);
 
-    // Cek data valid
-    if (!data.playerName || isNaN(data.amount)) {
-        console.log("❌ Donasi tidak valid:", req.body);
-        return res.json({ success: false });
-    }
-
-    // Cek apakah player sudah pernah donasi
-    const index = donations.findIndex(d => d.playerName === data.playerName);
-
-    if (index !== -1) {
-        donations[index].amount += data.amount;
-        console.log(`🔄 Update donasi ${data.playerName}: ${donations[index].amount}`);
-    } else {
-        donations.push({
-            playerName: data.playerName,
-            amount: data.amount,
-            message: data.message,
-            timestamp: Date.now()
-        });
-        console.log(`➕ Donatur baru: ${data.playerName}`);
-    }
-
-    donations.sort((a, b) => b.amount - a.amount);
-
-    console.log("📊 Total donasi tersimpan:", donations.length);
-    res.json({ success: true });
-});
-
-// ==============================
-app.get("/", (req, res) => {
-    res.json({
-        message: "Saweria Webhook Active",
-        status: "Optimized",
-        donorsStored: donations.length
+    console.log('✅ Donation processed:', {
+      id: donationId,
+      donor: donationData.donor_name,
+      amount: donationData.amount,
+      totalDonations: donations.length
     });
+
+    res.json({ 
+      success: true, 
+      message: 'Donation processed successfully',
+      donationId: donationId
+    });
+
+  } catch (error) {
+    console.error('❌ Webhook error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-// ==============================
-app.listen(3000, () => console.log("🚀 Webhook server ready"));
+// ✅ Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    totalDonations: donations.length,
+    serverTime: new Date().toISOString()
+  });
+});
+
+// ✅ Clear data endpoint (untuk testing)
+app.delete('/api/clear', (req, res) => {
+  donations = [];
+  processedIds.clear();
+  console.log('🧹 All data cleared');
+  res.json({ success: true, message: 'All data cleared' });
+});
+
+// ✅ Get stats
+app.get('/api/stats', (req, res) => {
+  const totalAmount = donations.reduce((sum, donation) => sum + (donation.amount || 0), 0);
+  
+  res.json({
+    totalDonations: donations.length,
+    totalAmount: totalAmount,
+    lastDonation: donations[donations.length - 1] || null,
+    serverUptime: process.uptime()
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Saweria Webhook Server running on port ${PORT}`);
+  console.log(`📊 Endpoints:`);
+  console.log(`   GET  /api/donations - Untuk Roblox fetch data`);
+  console.log(`   POST /api/webhook   - Untuk webhook Saweria`);
+  console.log(`   GET  /api/health    - Health check`);
+  console.log(`   GET  /api/stats     - Statistics`);
+});
