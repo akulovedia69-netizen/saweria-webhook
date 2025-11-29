@@ -10,12 +10,7 @@
     {
       "src": "/api/(.*)",
       "dest": "/server.js",
-      "methods": ["GET", "POST", "OPTIONS", "DELETE"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-callback-signature"
-      }
+      "methods": ["GET", "POST", "OPTIONS"]
     }
   ]
 }
