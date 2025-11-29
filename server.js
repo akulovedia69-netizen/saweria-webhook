@@ -12,16 +12,16 @@ app.use(express.json());
 let donations = [];
 let processedIds = new Set();
 
-// ✅ Endpoint untuk Roblox - SESUAI FORMAT YANG DIMINTA
+// ✅ Endpoint untuk Roblox - /api/donations
 app.get('/api/donations', (req, res) => {
   try {
-    console.log('📊 Fetching donations data for Roblox');
+    console.log('📊 Fetching donations data for Roblox - Total:', donations.length);
     
     // Format data sesuai dengan yang diharapkan script Roblox
     const formattedDonations = donations.map(donation => ({
       id: donation.id,
       amount: donation.amount,
-      playerName: donation.donor_name, // Sesuai dengan yang dicari script Roblox
+      playerName: donation.donor_name,
       donor_name: donation.donor_name,
       message: donation.message || '',
       timestamp: donation.timestamp
@@ -36,7 +36,7 @@ app.get('/api/donations', (req, res) => {
   }
 });
 
-// ✅ Endpoint untuk webhook Saweria - FORMAT RESMI SAWERIA
+// ✅ Endpoint untuk webhook Saweria - /api/webhook
 app.post('/api/webhook', (req, res) => {
   try {
     const saweriaData = req.body;
@@ -70,10 +70,9 @@ app.post('/api/webhook', (req, res) => {
       id: donationId,
       amount: amount,
       donor_name: donorName,
-      playerName: donorName, // ✅ SESUAI DENGAN YANG DICARI SCRIPT ROBLOX
+      playerName: donorName,
       message: message,
       timestamp: new Date().toISOString(),
-      // Simpan data asli untuk referensi
       rawData: saweriaData
     };
 
@@ -101,85 +100,20 @@ app.post('/api/webhook', (req, res) => {
   }
 });
 
-// ✅ Endpoint manual test (untuk testing tanpa webhook)
-app.post('/api/test-donation', (req, res) => {
-  try {
-    const { donor_name, amount, message } = req.body;
-    
-    const donationId = `test_${Date.now()}`;
-    const donationData = {
-      id: donationId,
-      amount: amount || 50000,
-      donor_name: donor_name || 'TestDonor',
-      playerName: donor_name || 'TestDonor',
-      message: message || 'Test donation',
-      timestamp: new Date().toISOString()
-    };
-
-    donations.push(donationData);
-    processedIds.add(donationId);
-
-    console.log('🧪 Test donation added:', donationData);
-    res.json({ success: true, donation: donationData });
-
-  } catch (error) {
-    console.error('Test donation error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // ✅ Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     totalDonations: donations.length,
-    serverTime: new Date().toISOString(),
-    endpoint: 'saweria-webhook-fawn.vercel.app'
+    serverTime: new Date().toISOString()
   });
-});
-
-// ✅ Get stats
-app.get('/api/stats', (req, res) => {
-  const totalAmount = donations.reduce((sum, donation) => sum + (donation.amount || 0), 0);
-  const uniqueDonors = new Set(donations.map(d => d.donor_name)).size;
-  
-  res.json({
-    totalDonations: donations.length,
-    totalAmount: totalAmount,
-    uniqueDonors: uniqueDonors,
-    lastDonation: donations[donations.length - 1] || null,
-    serverUptime: process.uptime()
-  });
-});
-
-// ✅ Clear data endpoint (untuk testing)
-app.delete('/api/clear', (req, res) => {
-  const previousCount = donations.length;
-  donations = [];
-  processedIds.clear();
-  console.log('🧹 All data cleared. Previous:', previousCount, 'donations');
-  res.json({ success: true, message: `Cleared ${previousCount} donations` });
-});
-
-// ✅ Get specific donation by ID
-app.get('/api/donations/:id', (req, res) => {
-  const donation = donations.find(d => d.id === req.params.id);
-  if (donation) {
-    res.json(donation);
-  } else {
-    res.status(404).json({ error: 'Donation not found' });
-  }
 });
 
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Saweria Webhook Server running on port ${PORT}`);
-  console.log(`📍 Domain: saweria-webhook-fawn.vercel.app`);
   console.log(`📊 Endpoints:`);
-  console.log(`   GET  /api/donations     - Untuk Roblox fetch data`);
-  console.log(`   POST /api/webhook       - Untuk webhook Saweria`);
-  console.log(`   POST /api/test-donation - Untuk testing manual`);
-  console.log(`   GET  /api/health        - Health check`);
-  console.log(`   GET  /api/stats         - Statistics`);
-  console.log(`   DELETE /api/clear       - Clear data (testing)`);
+  console.log(`   GET  /api/donations - Untuk Roblox fetch data`);
+  console.log(`   POST /api/webhook   - Untuk webhook Saweria`);
+  console.log(`   GET  /api/health    - Health check`);
 });
